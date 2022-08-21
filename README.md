@@ -6,7 +6,7 @@ Videosync connects to mpv using IPC to play the video.
 
 ## Dependencies
 - [mpv](https://mpv.io/)
-- ytp-dl (optional: can be used to play online videos with mpv)
+- yt-dlp (optional: can be used to play online videos with mpv)
 
 ## Usage
 Currently videosync only supports 1-1 connections.  
