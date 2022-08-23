@@ -2,7 +2,7 @@
 
 A peer-to-peer video syncing tool. Uses webrtc for communication. No video is transmitted, only the information necessary to sync the video is sent over a text based protocol. The same video file should be present with both the peers if a local video has to be synced.
 
-Videosync connects to mpv using IPC to play the video. 
+Videosync connects to mpv using IPC to play the video. A TURN server may be required if the ICE connection fails.
 
 ## Dependencies
 - [mpv](https://mpv.io/)

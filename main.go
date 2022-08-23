@@ -25,16 +25,15 @@ const compress = false
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	var videoName string
+	var videoName, turnServer, username, credential string
 	var host bool
 
 	flag.StringVar(&videoName, "video", "", "Video location or URL")
 	flag.BoolVar(&host, "host", false, "Start as host")
+	flag.StringVar(&turnServer, "turn", "", "TURN server")
+	flag.StringVar(&username, "username", "", "TURN server username")
+	flag.StringVar(&credential, "password", "", "TURN server password")
 	flag.Parse()
-
-	if videoName == "" && host {
-		log.Fatal("video cannot be empty")
-	}
 
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -48,6 +47,19 @@ func main() {
 				},
 			},
 		},
+	}
+
+	if turnServer != "" && username != "" && credential != "" {
+		config.ICEServers = append(config.ICEServers, webrtc.ICEServer{
+			URLs:           []string{turnServer},
+			Username:       username,
+			Credential:     credential,
+			CredentialType: webrtc.ICECredentialTypePassword,
+		})
+	}
+
+	if videoName == "" && host {
+		log.Fatal("video cannot be empty")
 	}
 
 	peerConnection, err := webrtc.NewPeerConnection(config)
@@ -151,10 +163,14 @@ func main() {
 			panic(err)
 		}
 
+		gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+
 		err = peerConnection.SetLocalDescription(answer)
 		if err != nil {
 			panic(err)
 		}
+
+		<-gatherComplete
 
 		fmt.Println("Answer: ", Encode(answer))
 	}
