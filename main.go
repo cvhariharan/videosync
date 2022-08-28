@@ -11,7 +11,9 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -28,11 +30,17 @@ func main() {
 	var videoName, turnServer, username, credential string
 	var host bool
 
+	baseDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	flag.StringVar(&videoName, "video", "", "Video location or URL")
 	flag.BoolVar(&host, "host", false, "Start as host")
 	flag.StringVar(&turnServer, "turn", "", "TURN server")
 	flag.StringVar(&username, "username", "", "TURN server username")
 	flag.StringVar(&credential, "password", "", "TURN server password")
+	flag.StringVar(&baseDir, "basedir", baseDir, "Base directory for videos. Default is current working directory")
 	flag.Parse()
 
 	config := webrtc.Configuration{
@@ -112,7 +120,7 @@ func main() {
 			}
 
 			// Send events
-			go SendEvents(datachannel, player)
+			go SendEvents(datachannel, player, host)
 
 			// Sync every 5 seconds
 			if host {
@@ -122,7 +130,7 @@ func main() {
 
 		datachannel.OnMessage(func(msg webrtc.DataChannelMessage) {
 			log.Println("Created datachannel")
-			Execute(datachannel, msg, player, videoName, host)
+			Execute(datachannel, msg, player, baseDir, videoName, host)
 
 		})
 	}
@@ -131,10 +139,10 @@ func main() {
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		log.Println("Created datachannel")
 		// Send events
-		go SendEvents(d, player)
+		go SendEvents(d, player, host)
 
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			Execute(d, msg, player, videoName, host)
+			Execute(d, msg, player, baseDir, videoName, host)
 		})
 	})
 
@@ -178,14 +186,13 @@ func main() {
 	select {}
 }
 
-func Execute(d *webrtc.DataChannel, msg webrtc.DataChannelMessage, player video.VideoPlayer, videoName string, host bool) {
+func Execute(d *webrtc.DataChannel, msg webrtc.DataChannelMessage, player video.VideoPlayer, baseDir, videoName string, host bool) {
 	fmt.Println(string(msg.Data))
 
 	if string(msg.Data) == "ECHO" {
 		if host {
-			d.SendText("[VIDEO];" + videoName)
 			go func() {
-				err := player.StartVideo(videoName)
+				err := player.StartVideo(filepath.Join(baseDir, videoName))
 				if err != nil {
 					log.Println(err)
 				}
@@ -203,6 +210,11 @@ func Execute(d *webrtc.DataChannel, msg webrtc.DataChannelMessage, player video.
 	switch string(command[0]) {
 	case "[VIDEO]":
 		filename := command[1]
+		u, err := url.Parse(filename)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			// Not a URL
+			filename = filepath.Join(baseDir, filename)
+		}
 		go func() {
 			err := player.StartVideo(filename)
 			if err != nil {
@@ -243,7 +255,7 @@ func Execute(d *webrtc.DataChannel, msg webrtc.DataChannelMessage, player video.
 	}
 }
 
-func SendEvents(datachannel *webrtc.DataChannel, player video.VideoPlayer) {
+func SendEvents(datachannel *webrtc.DataChannel, player video.VideoPlayer, host bool) {
 	events := player.Listener()
 	for {
 		event := <-events
@@ -255,6 +267,10 @@ func SendEvents(datachannel *webrtc.DataChannel, player video.VideoPlayer) {
 		case "seek":
 			if event.Value.(int) > 0 {
 				datachannel.SendText("[SEEK];" + strconv.Itoa(event.Value.(int)))
+			}
+		case "start-file":
+			if host {
+				datachannel.SendText("[VIDEO];" + event.Value.(string))
 			}
 		}
 	}

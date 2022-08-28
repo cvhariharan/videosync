@@ -3,6 +3,7 @@ package video
 import (
 	"errors"
 	"log"
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -41,7 +42,7 @@ func NewMPVPlayer(filename string) VideoPlayer {
 	socket := filepath.Join("/tmp", u.String())
 
 	go func() {
-		cmd := exec.Command("mpv", "--idle", "--input-unix-socket="+socket)
+		cmd := exec.Command("mpv", "--keep-open", "--idle", "--input-unix-socket="+socket)
 		if err := cmd.Run(); err != nil {
 			log.Fatal(err)
 		}
@@ -151,6 +152,20 @@ func (m *MPVPlayer) Listener() chan Event {
 					log.Println(err)
 				}
 				currEvent.Value = val
+			} else if event.Name == "start-file" {
+				path, err := m.conn.Get("path")
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Println("Now playing:", path)
+				video := path.(string)
+				u, err := url.Parse(video)
+				if err != nil || u.Scheme == "" || u.Host == "" {
+					// Not a URL
+					_, video = filepath.Split(video)
+				}
+				log.Println("Sending: ", video)
+				currEvent.Value = video
 			}
 			if currEvent.Name != m.receivedEvent {
 				m.setReceivedEvent("")
