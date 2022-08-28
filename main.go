@@ -24,11 +24,16 @@ import (
 
 const compress = false
 
+var (
+	version = "dev"
+	commit  = "none"
+)
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var videoName, turnServer, username, credential string
-	var host bool
+	var host, versionCmd bool
 
 	baseDir, err := os.Getwd()
 	if err != nil {
@@ -41,6 +46,7 @@ func main() {
 	flag.StringVar(&username, "username", "", "TURN server username")
 	flag.StringVar(&credential, "password", "", "TURN server password")
 	flag.StringVar(&baseDir, "basedir", baseDir, "Base directory for videos. Default is current working directory")
+	flag.BoolVar(&versionCmd, "version", false, "Shows the current version")
 	flag.Parse()
 
 	config := webrtc.Configuration{
@@ -68,6 +74,10 @@ func main() {
 
 	if videoName == "" && host {
 		log.Fatal("video cannot be empty")
+	}
+
+	if versionCmd {
+		fmt.Printf("Version: %s Commit: %s\n", version, commit)
 	}
 
 	peerConnection, err := webrtc.NewPeerConnection(config)
